@@ -130,5 +130,4 @@ class BikeRepositoryQueryCheckTest
             logger.info("value for key: " + key + " = " + value.asString());
         }
     }
-
 }
