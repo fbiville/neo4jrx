@@ -5,23 +5,23 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.neo4j.springframework.data.core.schema.GeneratedValue;
-import org.neo4j.springframework.data.core.schema.Id;
-import org.neo4j.springframework.data.core.schema.Node;
-import org.neo4j.springframework.data.core.schema.Relationship;
+import org.springframework.data.neo4j.core.schema.GeneratedValue;
+import org.springframework.data.neo4j.core.schema.Id;
+import org.springframework.data.neo4j.core.schema.Node;
+import org.springframework.data.neo4j.core.schema.Relationship;
 import uk.co.clarrobltd.neo4jrx.util.LocalDateTimeSupport;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.apache.commons.lang3.builder.ToStringStyle.JSON_STYLE;
-import static org.neo4j.springframework.data.core.schema.Relationship.Direction.OUTGOING;
+import static org.springframework.data.neo4j.core.schema.Relationship.Direction.OUTGOING;
 
 @Node("BikeState")
 public class BikeState
 {
     @Id @GeneratedValue
-    private long internalId;
+    private Long internalId;
     private final String externalId;
     private final String name;
     private final String description;
@@ -50,7 +50,7 @@ public class BikeState
         this.to = to;
     }
 
-    public long getInternalId()
+    public Long getInternalId()
     {
         return internalId;
     }

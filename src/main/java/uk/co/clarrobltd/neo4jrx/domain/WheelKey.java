@@ -1,25 +1,24 @@
 package uk.co.clarrobltd.neo4jrx.domain;
 
-import org.neo4j.springframework.data.core.schema.GeneratedValue;
-import org.neo4j.springframework.data.core.schema.Id;
-import org.neo4j.springframework.data.core.schema.Node;
-import org.neo4j.springframework.data.core.schema.Relationship;
+import org.springframework.data.neo4j.core.schema.GeneratedValue;
+import org.springframework.data.neo4j.core.schema.Id;
+import org.springframework.data.neo4j.core.schema.Node;
+import org.springframework.data.neo4j.core.schema.Relationship;
 
-import java.util.ArrayList;
 import java.util.List;
 
-import static org.neo4j.springframework.data.core.schema.Relationship.Direction.OUTGOING;
+import static org.springframework.data.neo4j.core.schema.Relationship.Direction.OUTGOING;
 
 @Node("Wheel")
 public class WheelKey
 {
     @Id @GeneratedValue
-    private long internalId;
+    private Long internalId;
     private final String externalId;
     @Relationship(type = "CURRENT_STATE", direction = OUTGOING)
     private WheelState currentState;
     @Relationship(type = "WHEEL_STATE", direction = OUTGOING)
-    private List<WheelState> wheelStates = new ArrayList<>();
+    private List<WheelState> wheelStates;
 
     public WheelKey(final String externalId, final WheelState currentState, final List<WheelState> wheelStates)
     {
@@ -28,7 +27,7 @@ public class WheelKey
         this.wheelStates = wheelStates;
     }
 
-    public long getInternalId()
+    public Long getInternalId()
     {
         return internalId;
     }

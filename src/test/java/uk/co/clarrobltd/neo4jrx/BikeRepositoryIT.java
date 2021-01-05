@@ -3,21 +3,23 @@ package uk.co.clarrobltd.neo4jrx;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.runner.RunWith;
-import org.neo4j.driver.Driver;
-import org.neo4j.driver.Session;
-import org.neo4j.springframework.boot.test.autoconfigure.data.DataNeo4jTest;
+import org.neo4j.harness.Neo4j;
+import org.neo4j.harness.Neo4jBuilders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.boot.test.autoconfigure.data.neo4j.DataNeo4jTest;
+import org.springframework.data.neo4j.core.Neo4jClient;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import uk.co.clarrobltd.neo4jrx.domain.BikeKey;
 import uk.co.clarrobltd.neo4jrx.domain.BikeRepository;
 import uk.co.clarrobltd.neo4jrx.domain.BikeState;
@@ -39,29 +41,49 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 
-@RunWith(SpringRunner.class)
+//@RunWith(SpringRunner.class)
 @DataNeo4jTest()
 @TestMethodOrder(OrderAnnotation.class)
 class BikeRepositoryIT
 {
     private static final Logger logger = LoggerFactory.getLogger(BikeRepositoryIT.class);
 
+    private static Neo4j embeddedDatabaseServer;
+
     @Autowired
     private BikeRepository bikeRepository;
 
-    @Qualifier("neo4jDriver")
-    @Autowired
-    private Driver driver;
+    @BeforeAll
+    static void initializeNeo4j()
+    {
+
+        embeddedDatabaseServer = Neo4jBuilders.newInProcessBuilder()
+                                              .withDisabledServer()
+                                              .build();
+    }
+
+    @DynamicPropertySource
+    static void neo4jProperties(DynamicPropertyRegistry registry)
+    {
+        registry.add("spring.neo4j.uri", embeddedDatabaseServer::boltURI);
+        registry.add("spring.neo4j.authentication.username", () -> "neo4j");
+        registry.add("spring.neo4j.authentication.password", () -> null);
+    }
+
+    @AfterAll
+    static void stopNeo4j()
+    {
+        embeddedDatabaseServer.close();
+    }
 
     @BeforeEach
-    void setup() throws IOException
+    void setup(@Autowired Neo4jClient neo4jClient) throws IOException
     {
-        try (final BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(this.getClass().getResourceAsStream("/bikes-test-data.cypher")));
-             final Session session = driver.session())
+        try (final BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(this.getClass().getResourceAsStream("/bikes-test-data.cypher"))))
         {
-            session.run("MATCH (n) DETACH DELETE n");
             final String bikesCypher = bufferedReader.lines().collect(joining(" "));
-            session.run(bikesCypher);
+            neo4jClient.query("MATCH (n) DETACH DELETE n;").run();
+            neo4jClient.query(bikesCypher).run();
         }
     }
 
@@ -93,7 +115,20 @@ class BikeRepositoryIT
 
     @Test
     @Order(3)
-    @DisplayName("Previous approach using OGM, this is what we would like, but paths don't work")
+    @DisplayName("Simple query returning one item (:Key)-[CURRENT_STATE]->(:State) using single path")
+    void shouldReadCurrentBikeUsingPath() throws JsonProcessingException
+    {
+        // arrange
+        final BikeKey expected = getExpectedCurrentRoubaix();
+        // act
+        final BikeKey actual = bikeRepository.getCurrentBikeUsingPath(expected.getExternalId());
+        // assert
+        assertEqual(actual, expected);
+    }
+
+    @Test
+    @Order(4)
+    @DisplayName("Deeper query returning one item and related state (:Key)-[CURRENT_STATE]->(:State)-[]-(relatedState) using two paths")
     void shouldReadCurrentBikeAndWheelOgmStyle() throws JsonProcessingException
     {
         // arrange
@@ -105,7 +140,7 @@ class BikeRepositoryIT
     }
 
     @Test
-    @Order(4)
+    @Order(5)
     @DisplayName("Would expect this to work as only making one connection")
     void shouldReadBikeUsingGetBikeOnly() throws JsonProcessingException
     {
@@ -118,8 +153,8 @@ class BikeRepositoryIT
     }
 
     @Test
-    @Order(5)
-    @DisplayName("Using collect() makes (key)-[:CURRENT_STATE)->(state) work")
+    @Order(6)
+    @DisplayName("Using collect() makes (:Key)-[:CURRENT_STATE)->(:State) work")
     void shouldReadBikeUsingGetBikeOnlyUsingCollect() throws JsonProcessingException
     {
         // arrange
@@ -131,7 +166,7 @@ class BikeRepositoryIT
     }
 
     @Test
-    @Order(6)
+    @Order(7)
     void shouldReadBikeUsingGetCurrentBikeAndRelatedData() throws JsonProcessingException
     {
         // arrange

@@ -3,28 +3,26 @@ package uk.co.clarrobltd.neo4jrx.domain;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
-import org.neo4j.springframework.data.core.schema.GeneratedValue;
-import org.neo4j.springframework.data.core.schema.Id;
-import org.neo4j.springframework.data.core.schema.Node;
-import org.neo4j.springframework.data.core.schema.Relationship;
+import org.springframework.data.neo4j.core.schema.GeneratedValue;
+import org.springframework.data.neo4j.core.schema.Id;
+import org.springframework.data.neo4j.core.schema.Node;
+import org.springframework.data.neo4j.core.schema.Relationship;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import static org.apache.commons.lang3.builder.ToStringStyle.JSON_STYLE;
-import static org.neo4j.springframework.data.core.schema.Relationship.Direction.OUTGOING;
+import static org.springframework.data.neo4j.core.schema.Relationship.Direction.OUTGOING;
 
 @Node("Bike")
 public class BikeKey
 {
     @Id @GeneratedValue
-    private long internalId;
+    private Long internalId;
     private final String externalId;
     @Relationship(type = "CURRENT_STATE", direction = OUTGOING)
     private BikeState currentState;
     @Relationship(type = "BIKE_STATE", direction = OUTGOING)
-    private List<BikeState> bikeStates = new ArrayList<>();
+    private List<BikeState> bikeStates;
 
     public BikeKey(final String externalId, final BikeState currentState, final List<BikeState> bikeStates)
     {
@@ -33,7 +31,7 @@ public class BikeKey
         this.bikeStates = bikeStates;
     }
 
-    public long getInternalId()
+    public Long getInternalId()
     {
         return internalId;
     }

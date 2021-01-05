@@ -1,7 +1,7 @@
 package uk.co.clarrobltd.neo4jrx.domain;
 
-import org.neo4j.springframework.data.repository.Neo4jRepository;
-import org.neo4j.springframework.data.repository.query.Query;
+import org.springframework.data.neo4j.repository.Neo4jRepository;
+import org.springframework.data.neo4j.repository.query.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -11,11 +11,19 @@ public interface BikeRepository extends Neo4jRepository<BikeKey, Long>
     BikeKey findByExternalId(@Param("externalId") final String externalId);
 
     @Query( "MATCH path =\n" +
+            "  (bike:Bike)-[:CURRENT_STATE]->(:BikeState)\n" +
+            "WHERE\n" +
+            "  bike.externalId = $externalId\n" +
+            "RETURN\n" +
+            "  path;")
+    BikeKey getCurrentBikeUsingPath(@Param("externalId") final String externalId);
+
+    @Query( "MATCH path =\n" +
             "  (bike:Bike)-[:CURRENT_STATE]->(bikeState:BikeState)\n" +
             "WHERE\n" +
             "  bike.externalId = $externalId\n" +
             "OPTIONAL MATCH relationsPath =\n" +
-            "  (bikeState)-[]->(relatedState)\n" +
+            "  (bikeState)-[]-(relatedState)\n" +
             "WHERE\n" +
             "  relatedState.from <= localdatetime('3000-01-01T00:00') < relatedState.to\n" +
             "RETURN\n" +

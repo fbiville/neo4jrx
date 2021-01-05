@@ -2,22 +2,22 @@ package uk.co.clarrobltd.neo4jrx.domain;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import org.neo4j.springframework.data.core.schema.GeneratedValue;
-import org.neo4j.springframework.data.core.schema.Id;
-import org.neo4j.springframework.data.core.schema.Node;
-import org.neo4j.springframework.data.core.schema.Relationship;
+import org.springframework.data.neo4j.core.schema.GeneratedValue;
+import org.springframework.data.neo4j.core.schema.Id;
+import org.springframework.data.neo4j.core.schema.Node;
+import org.springframework.data.neo4j.core.schema.Relationship;
 import uk.co.clarrobltd.neo4jrx.util.LocalDateTimeSupport;
 
 import java.time.LocalDateTime;
 
-import static org.neo4j.springframework.data.core.schema.Relationship.Direction.OUTGOING;
+import static org.springframework.data.neo4j.core.schema.Relationship.Direction.OUTGOING;
 
 @Node("WheelState")
 public class WheelState
 {
     @Id
     @GeneratedValue
-    private long internalId;
+    private Long internalId;
     private final String externalId;
     private final String name;
     private final String description;
@@ -44,7 +44,7 @@ public class WheelState
         this.to = to;
     }
 
-    public long getInternalId()
+    public Long getInternalId()
     {
         return internalId;
     }

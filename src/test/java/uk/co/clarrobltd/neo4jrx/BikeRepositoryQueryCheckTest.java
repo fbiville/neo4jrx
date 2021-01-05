@@ -1,22 +1,26 @@
 package uk.co.clarrobltd.neo4jrx;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
-import org.neo4j.driver.Driver;
 import org.neo4j.driver.Record;
-import org.neo4j.driver.Result;
-import org.neo4j.driver.Session;
 import org.neo4j.driver.Value;
-import org.neo4j.driver.Values;
 import org.neo4j.driver.internal.types.InternalTypeSystem;
 import org.neo4j.driver.types.Node;
-import org.neo4j.springframework.boot.test.autoconfigure.data.DataNeo4jTest;
-import org.neo4j.springframework.data.repository.query.Query;
+import org.neo4j.driver.types.Path;
+import org.neo4j.driver.types.Relationship;
+import org.neo4j.harness.Neo4j;
+import org.neo4j.harness.Neo4jBuilders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.test.autoconfigure.data.neo4j.DataNeo4jTest;
+import org.springframework.data.neo4j.core.Neo4jClient;
+import org.springframework.data.neo4j.repository.query.Query;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
 import uk.co.clarrobltd.neo4jrx.domain.BikeRepository;
 
@@ -24,9 +28,14 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.reflect.Method;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.StreamSupport.stream;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
@@ -37,27 +46,45 @@ class BikeRepositoryQueryCheckTest
 {
     private static final Logger logger = LoggerFactory.getLogger(BikeRepositoryQueryCheckTest.class);
 
-    @Autowired
-    private BikeRepository bikeRepository;
+    private static Neo4j embeddedDatabaseServer;
 
-    @Qualifier("neo4jDriver")
-    @Autowired
-    private Driver driver;
+    @BeforeAll
+    static void initializeNeo4j()
+    {
+
+        embeddedDatabaseServer = Neo4jBuilders.newInProcessBuilder()
+                                              .withDisabledServer()
+                                              .build();
+    }
+
+    @SuppressWarnings("unused")
+    @DynamicPropertySource
+    static void neo4jProperties(DynamicPropertyRegistry registry)
+    {
+        registry.add("spring.neo4j.uri", embeddedDatabaseServer::boltURI);
+        registry.add("spring.neo4j.authentication.username", () -> "neo4j");
+        registry.add("spring.neo4j.authentication.password", () -> null);
+    }
+
+    @AfterAll
+    static void stopNeo4j()
+    {
+        embeddedDatabaseServer.close();
+    }
 
     @BeforeEach
-    void setup() throws IOException
+    void setup(@Autowired Neo4jClient neo4jClient) throws IOException
     {
-        try (final BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(this.getClass().getResourceAsStream("/bikes-test-data.cypher")));
-             final Session session = driver.session())
+        try (final BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(this.getClass().getResourceAsStream("/bikes-test-data.cypher"))))
         {
-            session.run("MATCH (n) DETACH DELETE n");
             final String bikesCypher = bufferedReader.lines().collect(joining(" "));
-            session.run(bikesCypher);
+            neo4jClient.query("MATCH (n) DETACH DELETE n;").run();
+            neo4jClient.query(bikesCypher).run();
         }
     }
 
     @Test
-    void shouldRunReadQueriesFromAnnotationsToProveTheyAreValid() throws Exception
+    void shouldRunReadQueriesFromAnnotationsToProveTheyAreValid(@Autowired Neo4jClient neo4jClient)
     {
         for (final Method method : BikeRepository.class.getDeclaredMethods())
         {
@@ -69,19 +96,63 @@ class BikeRepositoryQueryCheckTest
             }
             final String query = queryAnnotation.value();
             logger.warn("Testing query: \n" + query);
-            try (final Session session = driver.session())
-            {
-                session.readTransaction(transaction -> {
-                    final Result result = transaction.run(query, Values.parameters("externalId", "Roubaix"));
-                    final List<Record> records = result.list();
-                    assertThat(records.size(), is(greaterThan(0)));
-                    logger.info("Got back " + records.size() + " record(s)");
-                    final Record record = records.get(0);
-                    logRecord(record);
-                    return true;
-                });
-            }
+            final Collection<Map<String, Object>> results = neo4jClient
+                    .query(query)
+                    .bind("Roubaix")
+                    .to("externalId")
+                    .fetch()
+                    .all();
+            logger.warn("RESULT SUMMARY: {}", results);
+            results.stream()
+                   .flatMap(stringObjectMap -> stringObjectMap.entrySet().stream())
+                   .forEach(entry -> {
+                       final String name = entry.getKey();
+                       final Object result = entry.getValue();
+                       final Class<?> resultClass = result.getClass();
+                       logger.warn("result name = {}, type = {}", name, resultClass.getName());
+                       if (result instanceof Path)
+                       {
+                           logPath((Path) result);
+                       }
+                       else if (result instanceof Record)
+                       {
+                           logRecord((Record) result);
+                       }
+                   });
+            assertThat(results.size(), is(greaterThan(0)));
         }
+    }
+
+    private void logPath(final Path path)
+    {
+        logger.warn("path length = {}, start labels = {}", path.length(), list(path.start().labels()));
+        getNodesStream(path).forEach(node -> logger.info(node(node)));
+        getRelationshipsStream(path).forEach(relationship -> logger.info(relationship(relationship)));
+    }
+
+    private String node(final Node node)
+    {
+        return "Node(" + node.id() + " " + list(node.labels()) + ")";
+    }
+
+    private String relationship(final Relationship relationship)
+    {
+        return "Relationship(" + relationship.id()  + " :" + relationship.type() + " (" + relationship.startNodeId() + ")->(" + relationship.endNodeId() + "))";
+    }
+
+    private List<String> list(final Iterable<String> iterable)
+    {
+        return stream(iterable.spliterator(), false).collect(toList());
+    }
+
+    private Stream<Node> getNodesStream(final Path path)
+    {
+        return stream(path.nodes().spliterator(), false);
+    }
+
+    private Stream<Relationship> getRelationshipsStream(final Path path)
+    {
+        return stream(path.relationships().spliterator(), false);
     }
 
     private void logRecord(final Record record)

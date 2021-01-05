@@ -1,9 +1,9 @@
 package uk.co.clarrobltd.neo4jrx;
 
-import org.neo4j.springframework.data.repository.config.EnableNeo4jRepositories;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
+import org.springframework.data.neo4j.repository.config.EnableNeo4jRepositories;
 
 @SpringBootApplication
 @EntityScan(basePackages = "uk.co.clarrobltd.neo4jrx")
